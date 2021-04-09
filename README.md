@@ -1,6 +1,6 @@
 # project_hse
 
-0. Установите дополнительные внешние модули: SpeechRecognition, moviepy, opencv-python, Theano, googletrans, google-trans-new, scikit-image v0.17.2, numpy, matplotlib, pydub. Также автоматически должны были установиться модули Pillow, requests (если возникли ошибки, установите их в ручную)
+0. Установите дополнительные внешние модули: SpeechRecognition, moviepy, opencv-python, Theano, googletrans, google-trans-new, scikit-image v0.17.2, numpy, matplotlib, pydub. Также автоматически должны были установиться модули Pillow, requests (если возникли ошибки, установите их вручную)
 1. Скачайте этот репозиторий
 2. Скачайте файл Demo-Europarl-EN.pcl с диска https://drive.google.com/drive/folders/0B7BsN5f2F1fZQnFsbzJ3TWxxMms , добавьте ее в папку, скачанную на первом шаге
 3. Запустите через командную строку, набрав путь до папки, а также python interface.py. Или через любой IDE для python файл interface.py
