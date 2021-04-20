@@ -1,0 +1,579 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{xcolor}
+\usepackage{amsmath}
+
+\title{Introduction to numerical analysis}
+\author{E. Burovski}
+\date{October 2020}
+
+\begin{document}
+
+\maketitle
+
+\part{}
+\section{Machine arithmetics}
+\subsection{A simple worked example}
+
+Let's talk a little bit about peculiarly of using floating-point numbers on the computer.
+At first, we'll try to divide 2 by 3. So let's see what's the answer is.
+
+\includegraphics{1.png}\\
+The answer is 0.66666... It's clear that this number is quite close to \(\frac{2}{3}\), but how close is decided by the computer, not us.\\
+\\Let's take one more simple example. Imagine, we want to take a very large number like \(10^{20}\), add 1 and subtract \(10^{20}\). We expect the result to equal 1.
+
+\includegraphics{2.png}\\
+We get 0 not 1. Actually that's not wrong. There is a reason why
+this simple arithmetic operations
+may produce unexpected results.\\
+\\Let's take one more example. We know that for usual real numbers the difference of squares is identical equal to the sum times the difference:
+\[
+a^2-b^2 \equiv (a+b)(a-b).
+\]
+Let’s check \[\frac{1}{\sqrt{1+x}-\sqrt{x}}=\sqrt{1+x}+\sqrt{x}\] using the previous equality.
+We have the sum of square roots and it should equal one over the difference of the square roots. Let's compare the right hand side and the left hand side evaluated numerically.
+
+\includegraphics{5.png}\\
+We take the right hand side -  the numerator, the left hand side - 1 over the denominator, we subtract them and expect the result to be 0. Let's see what it will be numerically.
+
+\includegraphics{6.png}\\
+We take this difference between the right hand side and the left hand side, evaluated for the range of values: \(10^{-20}\), 1, 1000, \(10^{10}\), \(10^{20}\) and compute the result. Remember: in all cases, we expect the result to be 0. Here is the result:
+
+\includegraphics{7.png}\\
+Let's see, what we have. For x equal \(10^{-20}\), the result is 0 as expected. For x equal 1 the result is \(-4.44 \times 10^{-16}\) that is reasonably close to 0, but how close is close. For 1000 the result is \(-7.22 \times 10^{-12}\). Is it close to 0? We do not know. If we take \(10^{10}\), the result is about 0.22, it is still larger, definitely not 0. For the last one \(10^{20}\) we have zero division error, so, denominator is 0. The problem is \(\sqrt{1 + x}\) apparently is equal to \(\sqrt{x}\) and that is strange.
+
+\subsection{Machine arithmetics. Representation of real numbers}
+
+Floating-point numbers are represented by a \textcolor{blue}{mantissa} and an \textcolor{blue}{exponent}:
+\[
+m\times 2^{p},
+\]
+where $m$ is a mantissa and $p$ is an exponent, with
+\[
+\frac{1}{2}\leq |m|<1.
+\]
+Now let's see how we represent both mantissa and exponent. Everything is binary in the computer. So the way we represent mantissa also known as \textcolor{blue}{significand} is by a string of $t$ binary digits:
+\[
+m=\pm\mu_1\mu_2...\mu_t.
+\]
+The first digit is the sign bit: $0$ is for "$+$" sign, $1$ is for "$-$" sign. Each other digit has the meaning of the corresponding power of 2, because everything is binary:
+\[
+m=\pm(\mu_1\times2^{-1}+\mu_2\times2^{-2}+...+\mu_t\times2^{-t}).
+\]
+It could be clearly seen that with this meaning the mantissa is indeed between $\frac{1}{2}$ and 1 by the absolute value.\\
+The way we represent the exponent, a fixed-width integer, is similar:
+\[
+p=\gamma_0\gamma_1\gamma_2...\gamma_L,
+\]
+here $\gamma_0$ is a sign bit and the rest are the digits of the binary presentation of fixed-width integers.\\
+Here is the way we store a number in a computer:
+\[
+\pm\gamma_0\gamma_1\gamma_2...\gamma_L\mu_1\mu_2...\mu_t.
+\]
+There is an IEEE standard that describes how it must work and defines
+several data types in terms of the bit width of the binary word:
+\begin{itemize}
+    \item single precision (32 bits) - 23 bit mantissa and 8 bit exponent (float)
+    \item double precision (64 bits) - 52 bit mantissa and 11 bit exponent (double)
+    \item extended precision
+\end{itemize}
+In fact, in the vast majority of
+applications you would just
+use the double precision datatype.\\
+\\
+The IEEE standard defines several special floating-point numbers. The first one is \textcolor{blue}{infinity}. There are two sign advantages as positive or negative infinity. \\Signed {\it infinities}: inf, defined as
+\[
+x<inf,\;\forall\;{\rm finite}\;x
+\]
+and the corresponding -$inf$.\\
+The standard also decrease the existence of a curious object called \textcolor{blue}{NAN}: \\{\it Not-a-number}: $nan$, defined as
+\[
+x=nan,\;{\rm if}\;x\neq x.
+\]
+Is meant to represent the results of invalid computations, e.g. 1/0. Any arithmetic computation involving a NAN results in a NAN.
+
+\subsection{Machine epsilon. Over- and underflow}
+
+The first immediate observation is that not all real numbers can be represented exactly. So we should be able to say what's the closest number which can be represented exactly.\\
+For two numbers to be as close to each other as possible, they must only differ in the \underline{lowest bit} of the mantissa:
+\[
+\pm(\mu_1\times2^{-1}+\mu_2\times2^{-2}+...+\underline{\mu_t\times2^{-t}})\times2^{p}.
+\]
+So the distance between two consecutive numbers with exponent is
+\[
+2^{p-t}.
+\]
+The granularity depends on the {\it bit-width} of the mantissa and the {\it value} of the exponent. As a consequence, any sort of computation incurs {\it rounding errors}. Therefore, we need to be aware of this rounding error in all sorts of calculation.\\
+\\As the absolute value of a rounding error $2^{p-t}$ depends on $p$, there is a point to consider the relative {\it rounding error}
+\[
+\frac{2^{p-t}}{2^p}=2^{-t},
+\]
+which only depends on the bit width of mantissa.\\
+\\{\bf Definition}:\\
+\textcolor{blue}{Machine epsilon} is the minimal number $\epsilon>0$, for which
+\[
+1+\epsilon\neq 1.
+\]
+It's clear that this epsilon is directly related to the bit width of the mantissa. Here is a ballpark estimate: for double precision $\epsilon\sim10^{-16}$, and for single precision $\epsilon\sim10^{-8}$. Notice that this machine epsilon is not the smallest number we can represent as a floating-point number.\\
+\[
+\pm(\mu_1\times2^{-1}+\mu_2\times2^{-2}+...+\mu_t\times2^{-t})\times2^{p}.
+\]
+The exponent, $p$, is a signed integer of $L$ bits. The maximum value of the the exponent is
+\[
+p_{max}=2^{L-1},
+\]
+{\it L - 1} is because we use the sign bit for the exponent - it is a signed integer.\\
+\\Therefore, nonzero numbers less than
+\[
+X_0=2^{-p_{max}}\times 2^{-1}=2^{-p_{max}-1}
+\]
+cannot be represented as floating-point values.\\
+\\{\bf Definition}:\\
+\textcolor{blue}{Machine zero} is the minimum nonzero value $X_0$, such that
+\[
+\frac{X_0}{2}=0.
+\]
+The word \textcolor{blue}{underflow} means exactly this, it is the result of an operation where the result should be finite but gets to equal 0 because of the granularity of the floating-point numbers.\\
+\\Notice that normally
+\[
+X_0 << \epsilon .
+\]
+The maximum value of exponent is \(p_{max}=2^{L-1}\). Therefore,
+\[
+x>X_{\infty}=2^{p_{max}}
+\]
+cannot be represented in floating-point numbers. And here we say that the computation \textcolor{blue}{overflows} to infinity.\\
+\\Notice that \(X_{\infty}\) differs from the special IEEE 754 value $inf$.\\
+\\{\bf Definition}:\\
+\textcolor{blue}{Machine infinity} is the minimal nonzero value \(X_{\infty}\), such that
+\[
+X_{\infty} \times 2
+\]
+overflows.
+
+\subsection{A crude estimate of the machine epsilon}
+
+Let's estimate the value of the machine epsilon. Epsilon is the smallest possible number which we can add to a unity so that the result is still distinguishable from unity. In exact arithmetic, this loop never terminates. Let's try this in normal a double precision.
+
+\includegraphics{8.png}\\
+Finally, the loop terminates at the value of the order of \(10^{-16}\), which is actually reasonable.\\
+\\So, if you are doing computations in double-precision and your results are of the order of \(10^{-16}\), it means that what you get is an indistinguishable from 0. In another words, \(10^{-16}\) means 0.
+
+\section{Systems of linear algebraic equations}
+\subsection{Systems of linear equations. Cramer's rule}
+
+Let's say we have a system of {\it m} linear equations for {\it m} unknowns $x_1, x_2, ...,  x_m$
+
+\begin{equation*}
+\begin{cases}
+    a_{11}x_1 + a_{12}x_2 + ... + a_{1m}x_m = b_1\\
+    a_{21}x_1 + a_{22}x_2 + ... + a_{2m}x_m = b_2\\
+    ...\\
+    a_{m1}x_1 + a_{m2}x_2 + ... + a_{mm}x_m = b_m
+\end{cases}
+\end{equation*}
+where $a_{ij}$ are real numbers, $i$ labels the equation and $j$ labels the unknown, and $b_i$ are also numbers.\\
+It's usually convenient to write the system in
+a matrix form:\\
+\[
+\begin{pmatrix}
+    a_{11} & a_{12} & a_{13} & ... & a_{1m}\\
+    a_{21} & a_{22} & a_{23} & ... & a_{2m}\\
+    ...\\
+    a_{m1} & a_{m2} & a_{m3} & ... & a_{mm}
+\end{pmatrix}
+\begin{pmatrix}
+    x_1\\
+    x_2\\
+    ...\\
+    x_m
+\end{pmatrix}
+=
+\begin{pmatrix}
+    b_1\\
+    b_2\\
+    ...\\
+    b_m
+\end{pmatrix}
+\]
+\[
+    or\; {\bf Ax} = {\bf b},
+\]
+where matrix {\bf A} consists of coefficients $a_{ij}$, the column vector of unknowns is {\bf x} and {\bf b} consists of $b_i$.\\
+\\{\bf Cramer's rule}:\\
+The formal solution for given system of linear equations {\bf Ax} = {\bf b} is
+\[
+x_k = \frac{{\rm det}{\bf A}_{(k)}}{{\rm det}{\bf A}}, \; k = 1,2,...,m.
+\]
+Here we require ${\rm det}{\bf A} \neq 0$ and each matrix ${\bf A}_{(k)}$ we form by replacing the k$_{th}$ column by the vector {\bf b}.\\
+\\{\bf The computational complexity of Cramer's rule}:\\
+A standard way to compute the determinants is using a {\it co-factor expansion} $-$ you walk along the first row, take the element $a_{1j}$, cross out the 1st row and the i$_{th}$ column and multiply this element $a_{1j}$ by what remains, by the co-factor which is a determinant of order $m-1$, and then you carry on walking along the first row.\\
+Let $C_m$ be the number of operations to compute the determinant of order $m\times m$.\\
+Clearly
+\[
+C_m = m C_{m-1},
+\]
+as you need to compute $m$ determinants of order $m-1$.\\
+For given value of $m$ the complexity is a factorial
+\[
+C_m = O(m!).
+\]
+The problem is that a factorial grows very fast. If we have a gigaflop machine that can do $10^9$ operations per second, then it will take about $3.6\times10^{-3}$ seconds to compute the determinant of order 10 and about 760 years for the determinant of order 20.\\
+Obviously, Cramer's rule is simply not useable, so this problem requires other methods. 
+
+\subsection{Gaussian elimination}
+
+Have a system of $m$ equations for $m$ unknowns: \(x_1, x_2, ..., x_m\)
+\[
+\begin{cases}
+    a_{11}x_1 + a_{12}x_2 + ... + a_{1m}x_m = b_1\\
+    a_{21}x_1 + a_{22}x_2 + ... + a_{2m}x_m = b_2\\
+    ...\\
+    a_{m1}x_1 + a_{m2}x_2 + ... + a_{mm}x_m = b_m
+\end{cases}
+\]
+Or, equivalently
+\[
+\begin{pmatrix}
+    a_{11} & a_{12} & a_{13} & ... & a_{1m}\\
+    a_{21} & a_{22} & a_{23} & ... & a_{2m}\\
+    ...\\
+    a_{m1} & a_{m2} & a_{m3} & ... & a_{mm}
+\end{pmatrix}
+\begin{pmatrix}
+    x_1\\
+    x_2\\
+    ...\\
+    x_m
+\end{pmatrix}
+=
+\begin{pmatrix}
+    b_1\\
+    b_2\\
+    ...\\
+    b_m
+\end{pmatrix}
+\]
+\[
+{\bf Ax} = {\bf b}.
+\]
+\\We know that for the solution of this system to exist and be unique, we need the matrix {\bf A} to be non-degenerate (${\rm det}{\bf A} \neq 0$). One way we do it is the so-called Gaussian elimination, which is a two-step process: first, we do a forward sweep and then back substitution.\\
+\\{\bf Forward sweep:}
+\[
+\begin{pmatrix}
+    a_{11} & a_{12} & a_{13} & ... & a_{1m}\\
+    a_{21} & a_{22} & a_{23} & ... & a_{2m}\\
+    ...\\
+    a_{m1} & a_{m2} & a_{m3} & ... & a_{mm}
+\end{pmatrix}
+\]
+We want to eliminate the first unknown from the second and subsequent equations. Firstly, we need to set the element in front of $x_1$ to 0. Next, we need to multiply the first equation by \(\gamma_{21}\) (\(\gamma_{21} = \frac{a_{21}}{a_{11}}\), \(a_{11} \neq 0\)) and subtract it from the second one.
+\[
+a_{11}x_1 + a_{12}x_2 + ... + a_{1m}x_m = b_1
+\]
+\[
+(a_{21}-\gamma_{21}a_{12})x_1 + (a_{22}-\gamma_{21}a_{11})x_2 + ... + (a_{2m}-\gamma_{21}a_{1m})x_m = b_2-\gamma_{21}b_1
+\]
+Let's look at the coefficients of the second equation:
+\[
+a_{21}-\gamma_{21}a_{12}=0
+\]
+\[
+a_{22}-\gamma_{21}a_{11}=a_{22}^{(1)}
+\]
+\[
+b_2-\gamma_{21}b_1 = b_2^{(1)}
+\]
+Then we continue working through the first column all the way up to \(\gamma_{m1}\) (\(\gamma_{m1} = \frac{a_{m1}}{a_{11}})\). Once we have done all these, we have eliminated all elements under $a_{11}$: $a_{22}, ..., a_{m1}$.\\
+\\After $m-1$ steps, we arrive at
+\[
+{\bf A}^{(1)}{\bf x} = {\bf b}^{(1)}
+\]
+with
+\[
+{\bf A}^{(1)}=
+\begin{pmatrix}
+    \times & \times & \times & ... & \times\\
+    0 & \times & \times & ... & \times\\
+    ...\\
+    0 & \times & \times & ... & \times
+\end{pmatrix}
+\]
+We managed to transform our matrix into the form, where the first unknown only enters the first equation. Then we consider smaller sub matrix (matrix \({\bf A}^{(1)}\) without the first row and the first column) and do the same thing. We define \(\gamma_{32}\) (\(\gamma_{32} = \frac{a_{32^{(1)}}}{a_{22}^{(1)}}\), \(a_{22}^{(1)} \neq 0\)), \(\gamma_{42}\), ..., \(\gamma_{m2}\) and eliminate all elements under \(a_{22}^{(1)}\) the same way.\\
+\\After $m-2$ steps, we arrive at
+\[
+{\bf A}^{(2)}{\bf x} = {\bf b}^{(2)}
+\]
+with
+\[
+{\bf A}^{(2)} =
+\begin{pmatrix}
+    \times & \times & \times & ... & \times\\
+    0 & \times & \times & ... & \times\\
+    0 & 0 & \times & ... & \times\\
+    ...\\
+    0 & 0 & \times & ... & \times
+\end{pmatrix}
+\]
+We have transformed our system of equations into the form, where all elements in the second column below the main diagonal are 0. Then we proceed with the smallest sub matrix and so on.\\
+Having annihilated $m-1$ columns, we arrive at
+\[
+{\bf A}^{(m-1)}{\bf x} = {\bf b}^{(m-1)}
+\]
+with an {\it upper triangular} matrix and call it {\bf U}
+\[
+{\bf A}^{(m-1)} =
+\begin{pmatrix}
+    \times & \times & \times & ... & \times & \times\\
+    0 & \times & \times & ... & \times & \times\\
+    0 & 0 & \times & ... & \times & \times\\
+    ...\\
+    0 & 0 & 0 & ... & \times & \times\\
+    0 & 0 & 0 & ... & 0 & \times
+\end{pmatrix}
+={\bf U}
+\]
+and this concludes the forward sweep.\\
+\\{\bf Back substitution:}
+\[
+\begin{pmatrix}
+    \times & \times & \times & ... & \times & \times\\
+    0 & \times & \times & ... & \times & \times\\
+    0 & 0 & \times & ... & \times & \times\\
+    ...\\
+    0 & 0 & 0 & ... & \times & \times\\
+    0 & 0 & 0 & ... & 0 & \times
+\end{pmatrix}
+\begin{pmatrix}
+    x_1\\
+    x_2\\
+    x_3\\
+    ...\\
+    x_{m-1}\\
+    x_m
+\end{pmatrix}
+=
+\begin{pmatrix}
+    \times\\
+    \times\\
+    \times\\
+    \times\\
+    ...\\
+    \times
+\end{pmatrix}
+\]
+Let's look at the last equation. From this, we quiet easily get $x_m$, which is just a ratio of two numbers. Then we will look at the ultimate equation. It contains the last and the second to last unknowns, but we already know the last one, so, from this equation we get $x_{m-1}$. Next, we move upwards all the way up to $x_1$ .\\
+\\Let's count the computational complexity of these Gaussian elimination.
+\\{\bf Forward sweep:}
+\\1st row: multiply $m-1$ elements, $a_{1k}, k=2,...,m$ by $\gamma_{21} \to m-1$ multiplies.
+\\2nd row: $m-1$ multiplies.
+\\...
+\\\\Total for the 1st column: $(m-1)^2$ operations.
+\\Total for the 2nd column: $(m-2)^2$ operations.
+\\...
+\\\\Total for the whole forward sweep:
+\[
+(m-1)^2 + (m-2)^2 + ... \sim O(m^3)
+\]
+{\bf Back substitution:}
+\\$m$-th row: 1 multiplication.
+\\$(m-1)$-th row: 2 multiplications.
+\\...
+\\\\Total is $\sim O(m^2)$.
+\\Comared to the forward sweep, back substitution is cheap.
+
+\subsection{LU decomposition: the matrix form of the Gaussian elimination}
+
+Remembering the algorithm of Gaussian elimination, we have 
+${\bf A}{\bf x} = {\bf b} \xrightarrow{} {\bf A}^{(1)}{\bf x} = {\bf b}^{(1)}$, where
+\[
+{\bf A} = 
+\begin{pmatrix}
+    a_{11} & a_{12} & a_{13} & ... & a_{1m}\\
+    a_{21} & a_{22} & a_{23} & ... & a_{2m}\\
+    ...\\
+    a_{m1} & a_{m2} & a_{m3} & ... & a_{mm}
+\end{pmatrix},
+\]
+and we have our gammas $\gamma_{21} = a_{21}/a_{11}, \gamma_{31} = a_{31}/a_{11}, ... , \gamma_{m1} = a_{m1}/a_{11}$, which were used to introduce zeros to the first column.\\
+Now we can construct a lower triangular matrix ${\bf L_1}$:
+\[
+{\bf L_1} = 
+\begin{pmatrix}
+    1 & 0 & 0 & ... & 0\\
+    -\gamma_{21} & 1 & 0 & ... & 0\\
+    -\gamma_{31} & 0 & 1 & ... & 0\\
+    ...\\
+    -\gamma_{m1} & 0 & 0 & ... & 1
+\end{pmatrix}.
+\]
+It is easy to see that the transformation of the first column of the Gaussian forward sweep is equivalent to left multiplying both the left hand-side and the right-hand side of the system by ${\bf L_1}$:
+\[
+    {\bf L_1}{\bf Ax} = {\bf L_1b}.
+\]
+Likewise, we can construct a lower triangular matrix ${\bf L_2}$:
+\[
+{\bf L_2} = 
+\begin{pmatrix}
+    1 & 0 & 0 & 0 & ... & 0\\
+    0 & 1 & 0 & 0 & ... & 0\\
+    0 & -\gamma_{32} & 1 & 0 & ... & 0\\
+    0 & -\gamma_{42} & 0 & 1 & ... & 0\\
+    ...\\
+    0 & -\gamma_{m2} & 0 & 0 & ... & 1
+\end{pmatrix}.
+\]
+Here the transformation of the second column of the Gaussian forward sweep is also equivalent to left multiplying both the left hand-side and the right-hand side of the system by ${\bf L_2}$:
+\[
+    {\bf L_2}{\bf L_1}{\bf Ax} = {\bf L_2}{\bf L_1b}.
+\]
+The whole forward sweep is equivalent to
+\[
+    {\bf L_{m-1}}...{\bf L_1}{\bf Ax} = {\bf L_{m-1}}...{\bf L_1b}.
+\]
+Now we have a string of this lambdas acting on {\bf A}, and the result is an upper triangular matrix {\bf U} because that's what a Gaussian elimination is for, so 
+\[
+{\bf L_{m-1}...L_1A = U}, \; {\bf L_{m-1}...L_1b = b}^{(m-1)}.
+\]
+What we get is
+\[
+    {\bf Ux=b}^{(m-1)}.
+\]
+From this point on, we can start with our back substitution in the usual way.\\
+We know that
+\[
+{\bf A = (L_{m-1}...L_1)^{-1}U}.
+\]
+Then
+\[
+    {\bf A = L_1^{-1}...L_{m-1}^{-1}U}.
+\]
+The point is that we can simplify this expression. Now we'll see what ${\bf L_k}$ looks like.\\
+Actually, it's very easy to check that the inverse of ${\bf L_1}$ looks very similar to ${\bf L_1}$ itself:
+\[
+{\bf L_1^{-1}} = 
+\begin{pmatrix}
+    1 & 0 & 0 & ... & 0\\
+    \gamma_{21} & 1 & 0 & ... & 0\\
+    \gamma_{31} & 0 & 1 & ... & 0\\
+    ...\\
+    \gamma_{m1} & 0 & 0 & ... & 1
+\end{pmatrix}.
+\]
+Likewise, the structure of ${\bf L_2^{-1}}$ is very similar to ${\bf L_2}$:
+\[
+{\bf L_2} = 
+\begin{pmatrix}
+    1 & 0 & 0 & 0 & ... & 0\\
+    0 & 1 & 0 & 0 & ... & 0\\
+    0 & \gamma_{32} & 1 & 0 & ... & 0\\
+    0 & \gamma_{42} & 0 & 1 & ... & 0\\
+    ...\\
+    0 & \gamma_{m2} & 0 & 0 & ... & 1
+\end{pmatrix}.
+\]
+And so on.\\
+If we take the product of these matrices we'll get following:
+\[
+{\bf L_1^{-1}L_2^{-1}...L_{m-1}^{-1}} = 
+\begin{pmatrix}
+    1 & 0 & 0 & ... & 0\\
+    \gamma_{21} & 1 & 0 & ... & 0\\
+    \gamma_{31} & \gamma_{32} & 1 & ... & 0\\
+    ...\\
+    \gamma_{m1} & \gamma_{m2} & \gamma_{m3} & ... & 1
+\end{pmatrix}.
+\]
+It is a lower triangular matrix {\bf L}.\\
+Now what we have is {\bf A = LU}.\\
+To conclude, what we do to solve a system of linear equations {\bf Ax = b}:
+\begin{itemize}
+    \item Decompose the l.h.s. matrix {\bf A}: {\bf A = LU}
+    \item Transform the r.h.s., compute ${\bf L^{-1}b}$
+    \item Solve ${\bf Ux = L^{-1}b}$
+\end{itemize}
+The first step is cubic in complexity and next two steps are actually cheap.
+
+\subsection{When does the Gaussian elimination work?}
+
+Let's see, what are the requirements for Gaussian elimination to work. We will be dividing things by this leading element $a_{11}$. So obviously we need to require that \(a_{11} \neq 0\).\\
+\\\({\bf A} \to {\bf A}^{(1)}:\)
+
+\[
+\begin{matrix}
+a_{11} & a_{12} & ...\\
+a_{21} & a_{22} & ...\\
+... & ... & ...
+\end{matrix}
+\]
+When working on the second column, we will be dividing things by the leading element, which here is $a_{22}^{(1)}$, so, it is also need not to be 0. And it is explicitly given by the linear combination of the elements from the top left corner of our matrix. \\
+\\\({\bf A}^{(1)} \to {\bf A}^{(2)}:\)
+
+\[
+\begin{matrix}
+a_{11} & a_{12} & ...\\
+0 & a_{22}^{(1)} & ...\\
+... & ... & ...
+\end{matrix} 
+\]
+remember: \(a_{22}^{(1)} = a_{22} - \frac{a_{21}}{a_{11}}a_{12} \neq 0\).\\
+That is, we need to require that the leading minor of the order 2 is non-zero.\\
+\\In fact, this whole process of Gaussian elimination requires that all leading minors of our matrix are non-zero.
+\[
+{\bf A} = 
+\begin{pmatrix}
+    a_{11} & a_{12} & a_{13} & ... & a_{1m}\\
+    a_{21} & a_{22} & a_{23} & ... & a_{2m}\\
+    ...\\
+    a_{m1} & a_{m2} & a_{m3} & ... & a_{mm}
+\end{pmatrix}
+\]
+This is quite a bit of a limitation. However, there is a way around it and that is coming up in the next paragraph.
+
+\subsection{LU decomposition with pivoting. Permutation matrices}
+
+\begin{itemize}
+    \item Solution of ${\bf A}x=b$ exists and is unique iff $det{\bf A} \neq 0$;
+    \item However, LU factorization requires all leading minors to be non zero;
+    \item If a leading minor close to zeo, it is also bad for stability.
+\end{itemize}
+The main idea: at each step, find a coefficient $a_{ij}$ with the largest absolute value (pivot), and eliminate the corresponding unknown $x_j$.
+\\Column pivoting (or partial pivoting): look for a max element along columns of {\bf A}:
+\[
+\begin{pmatrix}
+    a_{11} & a_{12} & a_{13} & ... & a_{1m}\\
+    a_{21} & a_{22} & a_{23} & ... & a_{2m}\\
+    ...\\
+    a_{m1} & a_{m2} & a_{m3} & ... & a_{mm}
+\end{pmatrix}
+\]
+If you work with the first column you scan the first column to find the maximum element. And then you swap the first and the this rows and then you proceed as usual. Complexity: $O(m)$ comparisons per column, it is cheap.
+\\\\One other possibility is the so-called full pivoting: look for a max element in the whole matrix {\bf A}. Swap rows and relabel the unknowns. Complexity: $O(m^2)$ comparisons per column and this is not very cheap. Because of this complexity, full pivoting is very rarely used.
+\\\\Permutation matrices. An elementary permutation matrix, $P_{kl}$, is a square matrix obtained from an identity matrix by swapping rows $k$ and $l$.
+\\$P_{kl}{\bf A}$ has rows $k$ and $l$ swapped, while ${\bf A}P_{kl}$ has columns $k$ and $l$ swapped.
+\\\\Then we can cast the Gaussian elimination with pivoting and the sequence of multiplication by this triangular matrices and permutation matrices. The process of constructing the LU factorization looks like this: for the $k$-th column, find a pivot (row $i_k$), left-multiply by $P_k=P_{k,i_k}$, then left-multiply by ${\bf \Lambda}_k$. Proceed for $k = 1, ... , m-1$.
+\[
+{\bf A}x = b
+\]
+\[
+{\bf \Lambda}_1P_1{\bf A}x = {\bf \Lambda}_1P_1b
+\]
+\[
+{\bf \Lambda}_2P_2{\bf \Lambda}_1P_1{\bf A}x = {\bf \Lambda}_2P_2{\bf \Lambda}_1P_1b
+\]
+\[
+...
+\]
+Finally,
+\[
+{\bf A}^{(m-1)} = {\bf \Lambda}_{m-1}P_{m-1}...{\bf \Lambda}_2P_2{\bf \Lambda}_1P_1{\bf A}.
+\]
+For any matrix {\bf A} with $det{\bf A} \neq 0$, factorization
+\[
+{\bf A} = P\: {\bf LU}
+\]
+exists and is unique.
+\\\\In other words, if your matrix {\bf A} is non-singular then there exists a permutation which makes all leading minors to be non-zero and then {\bf LU} decomposition works.
+
+\end{document}
